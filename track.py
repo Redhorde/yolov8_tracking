@@ -4,6 +4,7 @@ import argparse
 import cv2
 import os
 import json
+import yaml
 # limit the number of cpus used by high performance libraries
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -149,6 +150,11 @@ def run(
                 tracker_list[i].model.warmup()
     outputs = [None] * bs
 
+    buffer = []
+    boxes_buffer = {}
+    with open(tracking_config) as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+
     # Run tracking
     #model.warmup(imgsz=(1 if pt else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile(), Profile())
@@ -208,6 +214,11 @@ def run(
                 if prev_frames[i] is not None and curr_frames[i] is not None:  # camera motion compensation
                     tracker_list[i].tracker.camera_update(prev_frames[i], curr_frames[i])
 
+            # Buffer of video frames keeping last MAX_AGE frames
+            buffer.append(imc)
+            if len(buffer) > cfg.STRONGSORT.MAX_AGE:
+                buffer.pop(0)
+
             if det is not None and len(det):
                 if is_seg:
                     shape = im0.shape
@@ -243,6 +254,44 @@ def run(
                         )
                     
                     for j, (output) in enumerate(outputs[i]):
+
+                        if len(boxes_buffer) > 0:
+                            for box in boxes_buffer:
+                                found = False
+                                for output in outputs[i]:
+                                    if output[4] == boxes_buffer[box][0][4]:
+                                        found = True
+                                        break
+                                if not found:
+                                    boxes_buffer[box][1] += 1
+
+                        for j, (output) in enumerate(outputs[i]):
+
+                            # save missing frames from buffer if id is found again after missing for number of frames
+                            # lesser than MAX_AGE
+                            if save_crop and output[4] in boxes_buffer and cfg.STRONGSORT.MAX_AGE > \
+                                    boxes_buffer[output[4]][1] > 0:
+                                bboxes1 = boxes_buffer[output[4]][0][0:4]
+                                # bboxes2 = output[0:4]
+                                # bboxes = [min(bboxes1[0], bboxes2[0]),
+                                #           min(bboxes1[1], bboxes2[1]),
+                                #           max(bboxes1[2], bboxes2[2]),
+                                #           max(bboxes1[3], bboxes2[3])]
+                                # if save_crop and output[2] > imc.shape[1]:
+                                #     bboxes[2] = imc.shape[1]
+                                # if save_crop and output[3] > imc.shape[0]:
+                                #     bboxes[3] = imc.shape[0]
+                                for frame in range(boxes_buffer[output[4]][1]):
+                                    # print(save_dir / 'crops' / txt_file_name / names[int(output[5])] /
+                                    #       f'{int(output[4])}' / f'{p.stem}.jpg')
+                                    txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
+                                    if json_source:
+                                        save_one_box(np.array(bbox, dtype=np.int16), imc,
+                                                     file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{int(starting_timestamp + (frame_idx * (1 / fps * 1000)))}_{p.stem}.jpg', BGR=True)
+                                    else:
+                                        save_one_box(np.array(bbox, dtype=np.int16), imc,file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                            # add or update output to the output buffer
+                            boxes_buffer[output[4]] = [output, 0]
                         
                         bbox = output[0:4]
                         id = output[4]
@@ -261,23 +310,26 @@ def run(
                                                                bbox_top, bbox_w, bbox_h, -1, -1, -1, i))
 
                         if save_vid or save_crop or show_vid:  # Add bbox/seg to image
+                            fps = vid_cap.get(cv2.CAP_PROP_FPS)
                             c = int(cls)  # integer class
                             id = int(id)  # integer id
                             label = None if hide_labels else (f'{id} {names[c]}' if hide_conf else \
                                 (f'{id} {conf:.2f}' if hide_class else f'{id} {names[c]} {conf:.2f}'))
                             color = colors(c, True)
                             annotator.box_label(bbox, label, color=color)
-                            
-                            if save_trajectories and tracking_method == 'strongsort':
-                                q = output[7]
-                                tracker_list[i].trajectory(im0, q, color=color)
+
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 if json_source:
                                     save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
                                 else:
                                     save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
-
+                            if save_trajectories and tracking_method == 'strongsort':
+                                q = output[7]
+                                with open(save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.txt', 'a') as file:
+                                    file.write(str(q[-1]))
+                                    file.write('\n')
+                                tracker_list[i].trajectory(im0, q, color=color)
                             
             else:
                 pass
