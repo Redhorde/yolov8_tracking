@@ -216,7 +216,7 @@ def run(
 
             # Buffer of video frames keeping last MAX_AGE frames
             buffer.append(imc)
-            if len(buffer) > cfg.STRONGSORT.MAX_AGE:
+            if len(buffer) > cfg['strongsort']['max_age']:
                 buffer.pop(0)
 
             if det is not None and len(det):
@@ -269,7 +269,7 @@ def run(
 
                             # save missing frames from buffer if id is found again after missing for number of frames
                             # lesser than MAX_AGE
-                            if save_crop and output[4] in boxes_buffer and cfg.STRONGSORT.MAX_AGE > \
+                            if save_crop and output[4] in boxes_buffer and cfg['strongsort']['max_age'] > \
                                     boxes_buffer[output[4]][1] > 0:
                                 bboxes1 = boxes_buffer[output[4]][0][0:4]
                                 # bboxes2 = output[0:4]
