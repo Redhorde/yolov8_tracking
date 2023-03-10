@@ -93,7 +93,7 @@ def run(
     if json_source:
         with open(json_source) as json_file:
             data = json.load(json_file)
-            starting_timestamp = data['timestamps'][0]['timestamp_ms']  # get first timestamp of the video
+            starting_timestamp = data['video_start_ms']  # get first timestamp of the video
     if is_url and is_file:
         source = check_file(source)  # download
 
