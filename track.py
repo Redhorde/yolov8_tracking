@@ -285,11 +285,11 @@ def run(
                                     # print(save_dir / 'crops' / txt_file_name / names[int(output[5])] /
                                     #       f'{int(output[4])}' / f'{p.stem}.jpg')
                                     txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
+                                    buffer_frame = buffer[len(buffer) - boxes_buffer[output[4]][1] + frame]
                                     if json_source:
-                                        save_one_box(np.array(bbox, dtype=np.int16), imc,
-                                                     file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{int(starting_timestamp + (frame_idx * (1 / fps * 1000)))}_{p.stem}.jpg', BGR=True)
+                                        save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
                                     else:
-                                        save_one_box(np.array(bbox, dtype=np.int16), imc,file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                                        save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                             # add or update output to the output buffer
                             boxes_buffer[output[4]] = [output, 0]
                         
@@ -326,7 +326,7 @@ def run(
                                     save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                             if save_trajectories and tracking_method == 'strongsort':
                                 q = output[7]
-                                with open(save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.txt', 'a') as file:
+                                with open(save_dir / 'crops' / txt_file_name / names[c] / f'{id}_trajectory.txt', 'a') as file:
                                     file.write(str(q[-1]))
                                     file.write('\n')
                                 tracker_list[i].trajectory(im0, q, color=color)
