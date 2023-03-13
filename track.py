@@ -252,51 +252,49 @@ def run(
                             im_gpu=torch.as_tensor(im0, dtype=torch.float16).to(device).permute(2, 0, 1).flip(0).contiguous() /
                             255 if retina_masks else im[i]
                         )
+
+                    # count frames since last detection per ID
+                    if len(boxes_buffer) > 0:
+                        for box in boxes_buffer:
+                            found = False
+                            for output in outputs[i]:
+                                if output[4] == boxes_buffer[box][0][4]:
+                                    found = True
+                                    break
+                            if not found:
+                                boxes_buffer[box][1] += 1
                     
                     for j, (output) in enumerate(outputs[i]):
-
-                        if len(boxes_buffer) > 0:
-                            for box in boxes_buffer:
-                                found = False
-                                for output in outputs[i]:
-                                    if output[4] == boxes_buffer[box][0][4]:
-                                        found = True
-                                        break
-                                if not found:
-                                    boxes_buffer[box][1] += 1
-
-                        for j, (output) in enumerate(outputs[i]):
-
-                            # save missing frames from buffer if id is found again after missing for number of frames
-                            # lesser than MAX_AGE
-                            if save_crop and output[4] in boxes_buffer and cfg['strongsort']['max_age'] > \
-                                    boxes_buffer[output[4]][1] > 0:
-                                bboxes1 = boxes_buffer[output[4]][0][0:4]
-                                # bboxes2 = output[0:4]
-                                # bboxes = [min(bboxes1[0], bboxes2[0]),
-                                #           min(bboxes1[1], bboxes2[1]),
-                                #           max(bboxes1[2], bboxes2[2]),
-                                #           max(bboxes1[3], bboxes2[3])]
-                                # if save_crop and output[2] > imc.shape[1]:
-                                #     bboxes[2] = imc.shape[1]
-                                # if save_crop and output[3] > imc.shape[0]:
-                                #     bboxes[3] = imc.shape[0]
-                                for frame in range(boxes_buffer[output[4]][1]):
-                                    # print(save_dir / 'crops' / txt_file_name / names[int(output[5])] /
-                                    #       f'{int(output[4])}' / f'{p.stem}.jpg')
-                                    txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
-                                    buffer_frame = buffer[len(buffer) - boxes_buffer[output[4]][1] + frame]
-                                    if json_source:
-                                        save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
-                                    else:
-                                        save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{p.stem}.jpg', BGR=True)
-                            # add or update output to the output buffer
-                            boxes_buffer[output[4]] = [output, 0]
-                        
                         bbox = output[0:4]
                         id = output[4]
                         cls = output[5]
                         conf = output[6]
+
+                        # save missing frames from buffer if id is found again after missing for number of frames
+                        # lesser than MAX_AGE
+                        if save_crop and output[4] in boxes_buffer and cfg['strongsort']['max_age'] > \
+                                boxes_buffer[output[4]][1] > 0:
+                            bboxes1 = boxes_buffer[output[4]][0][0:4]
+                            # bboxes2 = output[0:4]
+                            # bboxes = [min(bboxes1[0], bboxes2[0]),
+                            #           min(bboxes1[1], bboxes2[1]),
+                            #           max(bboxes1[2], bboxes2[2]),
+                            #           max(bboxes1[3], bboxes2[3])]
+                            # if save_crop and output[2] > imc.shape[1]:
+                            #     bboxes[2] = imc.shape[1]
+                            # if save_crop and output[3] > imc.shape[0]:
+                            #     bboxes[3] = imc.shape[0]
+                            for frame in range(boxes_buffer[output[4]][1]):
+                                # print(save_dir / 'crops' / txt_file_name / names[int(output[5])] /
+                                #       f'{int(output[4])}' / f'{p.stem}.jpg')
+                                txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
+                                buffer_frame = buffer[len(buffer) - boxes_buffer[output[4]][1] + frame]
+                                if json_source:
+                                    save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
+                                else:
+                                    save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+                        # add or update output to the output buffer
+                        boxes_buffer[output[4]] = [output, 0]
 
                         if save_txt:
                             # to MOT format
