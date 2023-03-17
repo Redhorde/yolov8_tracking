@@ -270,6 +270,24 @@ def run(
                         cls = output[5]
                         conf = output[6]
 
+                        #check if bbox is not outside of image
+                        if bbox[2] > imc.shape[1]:
+                            print('Bbox outside image range')
+                            print('Image shape:', imc.shape)
+                            print('Bbox:', bbox)
+                            bbox[2] = imc.shape[1]
+                        if bbox[3] > imc.shape[0]:
+                            print('Bbox outside image range')
+                            print('Image shape:', imc.shape)
+                            print('Bbox:', bbox)
+                            bbox[3] = imc.shape[0]
+                        if bbox[0] < 0 or bbox[1] < 0 or bbox[2] < 0 or bbox[3] < 0:
+                            print('Negative number in bbox')
+                            print('Image shape:', imc.shape)
+                            print('Bbox:', bbox)
+                            bbox = [0, 0, 100, 200]
+                        # TODO Find the real cause for bboxes outside of image range
+
                         # save missing frames from buffer if id is found again after missing for number of frames
                         # lesser than MAX_AGE
                         if save_crop and output[4] in boxes_buffer and cfg['strongsort']['max_age'] > \
@@ -290,9 +308,15 @@ def run(
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 buffer_frame = buffer[len(buffer) - boxes_buffer[output[4]][1] + frame]
                                 if json_source:
-                                    save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
+                                    try:
+                                        save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
+                                    except:
+                                        print('Failed to save box')
+                                        print('Image shape:', imc.shape)
+                                        print('Bbox:', bbox)
                                 else:
                                     save_one_box(np.array(bboxes1, dtype=np.int16), buffer_frame, file=save_dir / 'crops' / txt_file_name / names[int(output[5])] / f'{id}' / f'{p.stem}.jpg', BGR=True)
+
                         # add or update output to the output buffer
                         boxes_buffer[output[4]] = [output, 0]
 
@@ -319,7 +343,12 @@ def run(
                             if save_crop:
                                 txt_file_name = txt_file_name if (isinstance(path, list) and len(path) > 1) else ''
                                 if json_source:
-                                    save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
+                                    try:
+                                        save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{int(starting_timestamp+(frame_idx*(1/fps*1000)))}_{p.stem}.jpg', BGR=True)
+                                    except:
+                                        print('Failed to save box')
+                                        print('Image shape:', imc.shape)
+                                        print('Bbox:', bbox)
                                 else:
                                     save_one_box(np.array(bbox, dtype=np.int16), imc, file=save_dir / 'crops' / txt_file_name / names[c] / f'{id}' / f'{p.stem}.jpg', BGR=True)
                             if save_trajectories and tracking_method == 'strongsort':
